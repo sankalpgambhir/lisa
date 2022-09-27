@@ -99,24 +99,51 @@ object ProofTactics {
     val p3 = Cut(pa.bot -< leftAphi.get ++ (pb.bot -< leftBnphi.get), 2, 1, nphi)
     SCProof(IndexedSeq(pa, pb, p2, p3))
   }
-  // pa is a proof of phi, pb is a proof of phi ==> ???
-  // |- phi ==> psi, phi===>gamma            |- phi
-  // -------------------------------------
-  //          |- psi, gamma
-  def modusPonens(phi: Formula)(pa: SCProofStep, pb: SCProofStep): SCProof = {
-    require(pa.bot.right.contains(phi))
-    val opsi = pb.bot.right.find {
-      case ConnectorFormula(Implies, Seq(l, _)) if isSame(l, phi) => true
-      case _ => false
-    }
-    if (opsi.isEmpty) SCProof(pa, pb)
-    else {
-      val psi = opsi.get.asInstanceOf[ConnectorFormula].args(1)
-      val p2 = hypothesis(psi)
-      val p3 = LeftImplies(emptySeq ++ (pa.bot -> phi) +< (phi ==> psi) +> psi, 0, 2, phi, psi)
-      val p4 = Cut(emptySeq ++ (pa.bot -> phi) ++< pb.bot +> psi ++> (pb.bot -> (phi ==> psi)), 1, 3, phi ==> psi)
-      SCProof(pa, pb, p2, p3, p4)
-    }
+
+  /**
+   * s1 is a proof of φ (phi), s2 is a proof that φ (phi) implies ψ (psi),
+   * t1 and t2 are proof step numbers corresponding to s1 and s2 respectively
+   *
+   * <pre>
+   * Σ |- φ, Π     Γ |- φ→ψ, Δ
+   * -------------------------
+   *     Γ, Σ |- ψ, Δ, Π
+   *
+   * </pre>
+   */
+  def modusPonens(phi: Formula, psi: Formula, s1: SCProofStep, s2: SCProofStep, t1: Int, t2: Int): SCSubproof = {
+    // check if phi is in s1
+    require(s1.bot.right.contains(phi))
+
+    // check if phi ==> psi is in s2
+    require(s2.bot.right.contains(Implies(phi, psi)))
+
+    val gamma = s2.bot.left
+    val delta = s2.bot.right - Implies(phi, psi)
+    val sigma = s1.bot.left
+    val pi = s1.bot.right - phi
+
+    // construct the proof
+    val p0 = hypothesis(phi)
+    val p1 = hypothesis(psi)
+    val p2 = LeftImplies(((phi, phi ==> psi) |- psi), 0, 1, phi, psi)
+    val p3 = Cut((sigma + (phi ==> psi)) |- (pi + psi), -1, 2, phi)
+    val p4 = Cut((gamma ++ sigma) |- (pi + psi) ++ delta, -2, 3, phi ==> psi)
+
+    /**
+     * s1 = Σ ⊢ ϕ, Π          Premise
+     * s2 = Γ ⊢ ϕ → ψ, Δ      Premise
+     *
+     * p0 = ϕ ⊢ ϕ             Hypothesis
+     * p1 = ψ ⊢ ψ             Hypothesis
+     * p2 = ϕ, ϕ → ψ ⊢ ψ      LeftImplies p0 p1
+     * p3 = Σ, ϕ → ψ ⊢ ψ, Π   Cut s1 p2
+     * p4 = Σ, Γ ⊢ ψ, Π, Δ    Cut s2 p4
+     *
+     */
+
+
+    SCSubproof(SCProof(IndexedSeq(p0, p1, p2, p3, p4), IndexedSeq(s1.bot, s2.bot)), Seq(t1, t2))
   }
 
   def detectSubstitution(x: VariableLabel, f: Formula, s: Formula, c: Option[Term] = None): (Option[Term], Boolean) = (f, s) match {
