@@ -644,4 +644,10 @@ object Orderings extends lisa.Main {
   //   ???
   // }
 
+  val noSetsOfAllSets = Theorem(
+    forall(z, in(z, x)) |- ()
+  ) {
+    have(thesis) by Sorry
+  }
+
 }
