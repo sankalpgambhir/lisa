@@ -159,7 +159,7 @@ object Recursion extends lisa.Main {
         // so dom g = <z
         have(setIntersection(initialSegment(p, z), initialSegment(p, t)) === initialSegment(p, z)) by Tautology.from(
           lastStep,
-          intersectionOfSubsets of (x -> initialSegment(p, z), y -> initialSegment(p, t))
+          setIntersectionSubset of (x -> initialSegment(p, z), y -> initialSegment(p, t))
         )
 
         have(thesis) by Substitution.ApplyRules(lastStep)(domgz)
@@ -272,7 +272,7 @@ object Recursion extends lisa.Main {
         // b < z ==> g_z(b) = g(b)
         val bToApp = have(in(b, initialSegment(p, z)) ==> (app(orderedRestriction(g, z, p), b) === app(g, b))) subproof {
           have(in(b, initialSegment(p, z)) ==> (app(restrictedFunction(g, initialSegment(p, z)), b) === app(g, b))) by Tautology.from(
-            restrictedFunctionApplication of (f -> g, x -> initialSegment(p, z), y -> b)
+            restrictedFunctionApplication2 of (f -> g, x -> initialSegment(p, z), y -> b)
           )
           thenHave(thesis) by Substitution.ApplyRules(ordResDef)
         }
@@ -1066,7 +1066,7 @@ object Recursion extends lisa.Main {
                         have(setIntersection(initialSegment(p, z), initialSegment(p, y)) === initialSegment(p, z)) by Tautology.from(
                           lastStep,
                           zySubset,
-                          intersectionOfSubsets of (x -> initialSegment(p, z), y -> initialSegment(p, y))
+                          setIntersectionSubset of (x -> initialSegment(p, z), y -> initialSegment(p, y))
                         )
 
                         have(thesis) by Substitution.ApplyRules(lastStep)(domEQ)
@@ -1781,7 +1781,7 @@ object Recursion extends lisa.Main {
                   )
                   val uwToRest = have(app(uw, z) === app(restrictedFunction(v, initialSegment(p, pr)), z)) by Substitution.ApplyRules(lastStep)(uwToOrd)
 
-                  have(app(restrictedFunction(v, initialSegment(p, pr)), z) === app(v, z)) by Tautology.from(restrictedFunctionApplication of (f -> v, x -> initialSegment(p, pr), y -> z))
+                  have(app(restrictedFunction(v, initialSegment(p, pr)), z) === app(v, z)) by Tautology.from(restrictedFunctionApplication2 of (f -> v, x -> initialSegment(p, pr), y -> z))
                   have(app(uw, z) === app(v, z)) by Substitution.ApplyRules(lastStep)(uwToRest)
 
                 }

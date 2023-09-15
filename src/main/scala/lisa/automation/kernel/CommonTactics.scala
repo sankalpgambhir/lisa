@@ -74,7 +74,9 @@ object CommonTactics {
             lib.thenHave((x === y) ==> substPhi) by Restate
           }
 
-          lib.assume(gammaPrime)
+          for (f <- gammaPrime) {
+            lib.assume(f)
+          }
 
           val backward = lib.have(phi |- (deltaPrime + (substPhi ==> (x === y)))) by Restate.from(uniqueness)
 

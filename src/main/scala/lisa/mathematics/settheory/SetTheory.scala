@@ -2946,7 +2946,10 @@ object SetTheory extends lisa.Main {
     sorry
   }
 
-  val restrictedFunctionApplication = Lemma(
+  /**
+   * TODO: derive this from the one below
+   */
+  val restrictedFunctionApplication2 = Lemma(
     in(y, x) |- app(f, y) === app(restrictedFunction(f, x), y)
   ) {
     sorry

@@ -1076,9 +1076,10 @@ object BasicStepTactic {
       )
 
       if (canReach.isEmpty) proof.InvalidProofTactic("Could not find a set of equalities to rewrite premise into conclusion successfully.")
-      else
+      else {
         val termLambda = canReach.get.toTermLambda
         RightSubstEq(equalities.toList, termLambda)(premise)(bot)
+      }
     }
   }
 

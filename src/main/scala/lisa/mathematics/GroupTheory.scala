@@ -7,10 +7,10 @@ import lisa.automation.kernel.CommonTactics.ExistenceAndUniqueness
 import lisa.automation.kernel.OLPropositionalSolver.Tautology
 import lisa.automation.settheory.SetTheoryTactics.UniqueComprehension
 import lisa.kernel.proof.SequentCalculus.Hypothesis
-import lisa.mathematics.FirstOrderLogic.equalityTransitivity
-import lisa.mathematics.FirstOrderLogic.existsOneImpliesExists
-import lisa.mathematics.FirstOrderLogic.substitutionInUniquenessQuantifier
-import lisa.mathematics.SetTheory.*
+import lisa.mathematics.fol.Quantifiers.equalityTransitivity
+import lisa.mathematics.fol.Quantifiers.existsOneImpliesExists
+import lisa.mathematics.fol.Quantifiers.substitutionInUniquenessQuantifier
+import lisa.mathematics.settheory.SetTheory.*
 
 /**
  * Group theory, developed following Chapter 2 of S. Lang "Undergraduate Algebra".
