@@ -84,7 +84,7 @@ object Tableau extends ProofTactic with ProofSequentTactic with ProofFactSequent
   inline def solve(sequent: F.Sequent): Option[SCProof] = solve(sequent.underlying)
 
   def solve(sequent: K.Sequent): Option[SCProof] = {
-    val f = K.multiand(sequent.left.toSeq ++ sequent.right.map(f => K.neg(f)))
+    val f = K.multiand(sequent.left.toSeq ++ sequent.right.map(f => K.neg(f): K.Expression))
     val taken = f.allVariables
     val nextIdNow = if taken.isEmpty then 0 else taken.maxBy(_.id.no).id.no + 1
     val (fnamed, nextId) = makeVariableNamesUnique(f, nextIdNow, f.freeVariables)
@@ -236,25 +236,25 @@ object Tableau extends ProofTactic with ProofSequentTactic with ProofFactSequent
    * The substitution cannot do substitutions that were already done in branch.triedInstantiation.
    * When multiple substitutions are possible, the one with the smallest size is returned. (Maybe there is a better heuristic, like distance from the root?)
    */
-  def close(branch: Branch): Option[(Substitution, Set[Expression])] = {
+  def close(branch: Branch): Option[(Substitution, SSet[Expression])] = {
     val newMap = branch.atoms._1
       .flatMap(pred => pred.freeVariables.filter(v => branch.unifiable.contains(v)))
       .map(v => v -> Variable(Identifier(v.id.name, v.id.no + branch.maxIndex + 1), Ind))
       .toMap
     val inverseNewMap = newMap.map((k, v) => v -> k).toMap
     val pos = branch.atoms._1.map(pred => substituteVariables(pred, newMap)).iterator
-    var substitutions: List[(Substitution, Set[Expression])] = Nil
+    var substitutions: List[(Substitution, SSet[Expression])] = Nil
 
     while (pos.hasNext) {
       val p = pos.next()
-      if (p == bot) return Some((Substitution.empty, Set(bot)))
+      if (p == bot) return Some((Substitution.empty, SSet(bot)))
       val neg = branch.atoms._2.iterator
       while (neg.hasNext) {
         val n = neg.next()
         unifyPred(p, n, branch) match
           case None => ()
           case Some(unif) =>
-            substitutions = (unif, Set(p, !n)) :: substitutions
+            substitutions = (unif, SSet(p, !n)) :: substitutions
       }
     }
 
@@ -282,7 +282,7 @@ object Tableau extends ProofTactic with ProofSequentTactic with ProofFactSequent
 
   }
 
-  def bestSubst(substs: List[(Substitution, Set[Expression])], branch: Branch): Option[(Substitution, Set[Expression])] = {
+  def bestSubst(substs: List[(Substitution, SSet[Expression])], branch: Branch): Option[(Substitution, SSet[Expression])] = {
     if substs.isEmpty then return None
     val minSize = substs.minBy(_._1.size)
     val smallSubst = substs.filter(_._1.size == minSize._1.size)
@@ -413,7 +413,7 @@ object Tableau extends ProofTactic with ProofSequentTactic with ProofFactSequent
 
     val closeSubst = close(branch)
     if (closeSubst.nonEmpty && closeSubst.get._1.isEmpty) // If branch can be closed without Instantiation (Hyp)
-      Some((List(RestateTrue(Sequent(closeSubst.get._2, Set()))), 0))
+      Some((List(RestateTrue(Sequent(closeSubst.get._2, SSet()))), 0))
     else if (branch.alpha.nonEmpty) // If branch contains an Alpha formula (LeftAnd)
       val rec = alpha(branch)
       decide(rec).map((proof, step) =>

@@ -7,6 +7,7 @@ import leo.modules.input.{TPTPParser => Parser}
 import lisa.automation.Tableau
 import lisa.automation.Tautology
 import lisa.utils.K
+import K.{SSet, given}
 
 import java.io.File
 
@@ -70,7 +71,7 @@ object ProofParser {
             case s: FOF.Sequent => s
           }
           if fa.role == "axiom" then
-            val sequent = K.Sequent(fofsequent.lhs.map(convertToKernel).toSet, fofsequent.rhs.map(convertToKernel).toSet)
+            val sequent = K.Sequent(fofsequent.lhs.map(convertToKernel).to(SSet), fofsequent.rhs.map(convertToKernel).to(SSet))
             nameMap(fa.name) = (-prems.size - 1, fofsequent)
             prems = sequent :: prems
           else
@@ -487,7 +488,7 @@ object ProofParser {
             val right = sequent.rhs.map(convertToKernel)
             val formula = right(n.toInt)
             formula match
-              case K.equality(s, t) if K.isSame(s, t) => Some((K.RightRefl(K.Sequent(left.toSet, right.toSet), formula), name))
+              case K.equality(s, t) if K.isSame(s, t) => Some((K.RightRefl(K.Sequent(left.to(SSet), right.to(SSet)), formula), name))
               case _ => throw new Exception(s"$name: Expected an equality, but got $formula")
           case _ => None
         }

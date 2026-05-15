@@ -121,16 +121,16 @@ class RunningTheory {
 
   def sequentFromJustification(j: Justification): Sequent = j match {
     case Theorem(name, proposition, _) => proposition
-    case Axiom(name, ax) => Sequent(Set.empty, Set(ax))
+    case Axiom(name, ax) => Sequent(SSet.empty, SSet(ax))
     case Definition(cst, e, vars) =>
       val left = vars.foldLeft(cst: Expression)(_(_))
       val right = vars.foldLeft(e)(_(_))
       if (left.sort == Prop) {
         val inner = iff(left)(right)
-        Sequent(Set(), Set(inner))
+        Sequent(SSet.empty, SSet(inner))
       } else {
         val inner = equality(left)(right)
-        Sequent(Set(), Set(inner))
+        Sequent(SSet.empty, SSet(inner))
       }
   }
 

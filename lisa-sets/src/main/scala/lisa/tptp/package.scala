@@ -2,6 +2,7 @@ package lisa.tptp
 
 import leo.datastructures.TPTP
 import lisa.utils.K
+import K.{SSet, given}
 
 sealed trait AnnotatedStatement {
   def role: String
@@ -14,7 +15,7 @@ sealed trait AnnotatedStatement {
   }
 
   def toSequent: AnnotatedSequent = this match {
-    case f: AnnotatedFormula => AnnotatedSequent(role, name, K.Sequent(Set(), Set(f.formula)), annotations)
+    case f: AnnotatedFormula => AnnotatedSequent(role, name, K.Sequent(SSet.empty, SSet(f.formula)), annotations)
     case s: AnnotatedSequent => s
   }
 }

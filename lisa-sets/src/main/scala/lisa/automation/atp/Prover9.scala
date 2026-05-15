@@ -81,7 +81,7 @@ object Prover9 extends ProofTactic with ProofSequentTactic {
     val directory = File(foldername)
     if (directory != null) && !directory.exists() then directory.mkdirs()
 
-    val freevars = (sequent.left.flatMap(_.freeVariables) ++ sequent.right.flatMap(_.freeVariables)).toSet.map(x => x -> K.Variable(K.Identifier("X" + x.id.name, x.id.no), x.sort)).toMap
+    val freevars = ((sequent.left: Set[K.Expression]).flatMap(_.freeVariables) ++ (sequent.right: Set[K.Expression]).flatMap(_.freeVariables)).toSet.map(x => x -> K.Variable(K.Identifier("X" + x.id.name, x.id.no), x.sort)).toMap
 
     val backMap = freevars.map {
       case (x: K.Variable, xx: K.Variable) => xx -> x

@@ -1,6 +1,7 @@
 package lisa.kernel.proof
 
 import lisa.kernel.fol.FOL._
+import scala.collection.immutable.{SortedSet}
 
 /**
  * The concrete implementation of sequent calculus (with equality).
@@ -13,6 +14,23 @@ import lisa.kernel.fol.FOL._
 object SequentCalculus {
 
   /**
+    * Alias for [[SortedSet]]
+    */
+  type SSet[T] = scala.collection.immutable.SortedSet[T]
+  /**
+   * Alias for [[SortedSet]]
+   */
+  val SSet = scala.collection.immutable.SortedSet
+
+  implicit val exprOrdering: Ordering[Expression] = Ordering.by(_.uniqueNumber)
+
+  // Ordering is invariant so we provide the trivial orderings for the subtypes of expression
+  // implicit val constOrdering: Ordering[Constant] = exprOrdering.on(c => c)
+  // implicit val varOrdering: Ordering[Variable] = exprOrdering.on(v => v)
+  // implicit val applicationOrdering: Ordering[Application] = exprOrdering.on(a => a)
+  // implicit val lambdaOrdering: Ordering[Lambda] = exprOrdering.on(l => l)
+
+  /**
    * A sequent is an object that can contain two sets of formulas, [[left]] and [[right]].
    * The intended semantic is for the [[left]] formulas to be interpreted as a conjunction, while the [[right]] ones as a disjunction.
    * Traditionally, sequents are represented by two lists of formulas.
@@ -21,7 +39,7 @@ object SequentCalculus {
    * @param left the left side of the sequent
    * @param right the right side of the sequent
    */
-  case class Sequent(left: Set[Expression], right: Set[Expression]) {
+  case class Sequent(left: SSet[Expression], right: SSet[Expression]) {
     require(left.forall(_.sort == Prop) && right.forall(_.sort == Prop), "Sequent can only contain formulas")
   }
 

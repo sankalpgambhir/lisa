@@ -215,7 +215,7 @@ object KernelHelpers {
 
   /* Sequents */
 
-  val emptySeq: Sequent = Sequent(Set.empty, Set.empty)
+  val emptySeq: Sequent = Sequent(SSet.empty, SSet.empty)
 
   extension (s: Sequent) {
     // non OL-based / naive Sequent manipulation
@@ -267,19 +267,19 @@ object KernelHelpers {
    * @tparam T The type to convert from
    */
   protected trait ExpressionSetConverter[-T] {
-    def apply(t: T): Set[Expression]
+    def apply(t: T): SSet[Expression]
   }
 
-  def toExpressionSet[T](x: T)(using converter: ExpressionSetConverter[T]): Set[Expression] = converter(x)
+  def toExpressionSet[T](x: T)(using converter: ExpressionSetConverter[T]): SSet[Expression] = converter(x)
 
-  given ExpressionSetConverter[Unit] = _ => Set()
-  given ExpressionSetConverter[EmptyTuple] = _ => Set()
+  given ExpressionSetConverter[Unit] = _ => SSet.empty
+  given ExpressionSetConverter[EmptyTuple] = _ => SSet.empty
 
   given [H, T <: Tuple](using ExpressionSetConverter[H], ExpressionSetConverter[T]): ExpressionSetConverter[H *: T] =
     t => toExpressionSet(t.head) ++ toExpressionSet(t.tail)
 
-  given ExpressionSetConverter[Expression] = Set(_)
-  given ExpressionSetConverter[Iterable[Expression]] = _.toSet
+  given ExpressionSetConverter[Expression] = e => SSet(e)
+  given ExpressionSetConverter[Iterable[Expression]] = _.to(SSet)
 
   extension [L](left: L)(using ExpressionSetConverter[L]) {
 
@@ -480,7 +480,9 @@ object KernelHelpers {
      * @param s The sequent to check
      * @return The List of undefined symols
      */
-    def findUndefinedSymbols(s: Sequent): Set[Constant] =
+    def findUndefinedSymbols(s: Sequent): SSet[Constant] =
+      // convince the compiler that constants can be ordered as expressions
+      given Ordering[Constant] = summon[Ordering[Expression]].on(identity)
       s.left.flatMap(findUndefinedSymbols) ++ s.right.flatMap(findUndefinedSymbols)
 
   }

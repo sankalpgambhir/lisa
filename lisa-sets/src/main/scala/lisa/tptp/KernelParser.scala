@@ -8,6 +8,7 @@ import lisa.tptp._
 import lisa.utils.K
 import lisa.utils.KernelHelpers._
 import lisa.utils.KernelHelpers.given_Conversion_String_Identifier
+import K.{SSet, given}
 
 import java.io.File
 
@@ -67,7 +68,7 @@ object KernelParser {
   }
 
   def convertToKernel(sequent: FOF.Sequent)(using defctx: DefContext, maps: ((String, Int) => K.Expression, (String, Int) => K.Expression, String => K.Variable)): K.Sequent = {
-    K.Sequent(sequent.lhs.map(convertToKernel).toSet, sequent.rhs.map(convertToKernel).toSet)
+    K.Sequent(sequent.lhs.map(convertToKernel).to(SSet), sequent.rhs.map(convertToKernel).to(SSet))
   }
 
   def convertToKernel(formula: CNF.Formula)(using defctx: DefContext, maps: ((String, Int) => K.Expression, (String, Int) => K.Expression, String => K.Variable)): K.Expression = {
@@ -121,7 +122,7 @@ object KernelParser {
         formula match {
           case FOF.Logical(formula) => AnnotatedFormula(role, name, convertToKernel(formula), annotations)
           case FOF.Sequent(antecedent, succedent) =>
-            AnnotatedSequent(role, name, K.Sequent(antecedent.map(convertToKernel).toSet, succedent.map(convertToKernel).toSet), annotations)
+            AnnotatedSequent(role, name, K.Sequent(antecedent.map(convertToKernel).to(SSet), succedent.map(convertToKernel).to(SSet)), annotations)
         }
 
   }
@@ -157,7 +158,7 @@ object KernelParser {
         formula match {
           case FOF.Logical(formula) => AnnotatedFormula(role, name, convertToKernel(formula), annotations)
           case FOF.Sequent(antecedent, succedent) =>
-            AnnotatedSequent(role, name, K.Sequent(antecedent.map(convertToKernel).toSet, succedent.map(convertToKernel).toSet), annotations)
+            AnnotatedSequent(role, name, K.Sequent(antecedent.map(convertToKernel).to(SSet), succedent.map(convertToKernel).to(SSet)), annotations)
         }
       case TPTP.CNFAnnotated(name, role, formula, annotations, origin) =>
         formula match {

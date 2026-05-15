@@ -7,6 +7,8 @@ import lisa.utils.prooflib.ProofTacticLib._
 import lisa.utils.prooflib._
 import lisa.utils.unification.UnificationUtils._
 
+import K.{SSet, given}
+
 object BasicStepTactic {
 
   def unwrapTactic(using lib: Library, proof: lib.Proof)(using tactic: ProofTactic)(judgement: proof.ProofTacticJudgement)(message: String): proof.ProofTacticJudgement = {
@@ -41,7 +43,7 @@ object BasicStepTactic {
   object RestateTrue_ extends ProofTactic with ProofSequentTactic {
     def apply(using lib: Library, proof: lib.Proof)(bot: F.Sequent): proof.ProofTacticJudgement = {
       val botK = bot.underlying
-      if (!K.isSameSequent(botK, K.Sequent(Set(), Set(K.top))))
+      if (!K.isSameSequent(botK, K.Sequent(SSet.empty, SSet(K.top))))
         proof.InvalidProofTactic("The desired conclusion is not a trivial tautology.")
       else
         proof.ValidProofTactic(bot, Seq(K.RestateTrue(botK)), Seq())

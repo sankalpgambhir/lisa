@@ -3,6 +3,8 @@ package lisa.utils.fol
 import lisa.utils.K
 import lisa.utils.prooflib.ProofTacticLib.ProofTactic
 
+import K.{SSet, given}
+
 trait Sequents extends Predef {
 
   /**
@@ -25,7 +27,7 @@ trait Sequents extends Predef {
     /**
      * The underlying kernel sequent.
      */
-    def underlying: lisa.kernel.proof.SequentCalculus.Sequent = K.Sequent(left.map(_.underlying), right.map(_.underlying))
+    def underlying: K.Sequent = K.Sequent(left.map(_.underlying).to(SSet), right.map(_.underlying).to(SSet))
 
     def substituteUnsafe(m: Map[Variable[?], Expr[?]]): Sequent = Sequent(left.map(_.substituteUnsafe(m)), right.map(_.substituteUnsafe(m)))
     override def substituteWithCheck(m: Map[Variable[?], Expr[?]]): Sequent =

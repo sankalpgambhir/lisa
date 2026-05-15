@@ -42,7 +42,7 @@ object SCProofChecker {
            *    Γ |- Γ
            */
           case RestateTrue(s) =>
-            val truth = Sequent(Set(), Set(top))
+            val truth = Sequent(SSet(), SSet(top))
             if (isSameSequent(s, truth)) SCValidProof(SCProof(step)) else SCInvalidProof(SCProof(step), Nil, s"The desired conclusion is not a trivial tautology")
           /*
            *
@@ -105,11 +105,11 @@ object SCProofChecker {
             if (disjuncts.exists(phi => phi.sort != Prop)) {
               val culprit = disjuncts.find(phi => phi.sort != Prop).get
               SCInvalidProof(SCProof(step), Nil, "all φs must be a formula, but " + culprit + " is a " + culprit.sort)
-            } else if (isSameSet(b.right, t.map(ref(_).right).fold(Set.empty)(_ union _))) {
+            } else if (isSameSet(b.right, t.map(ref(_).right).fold(SSet.empty)(_ union _))) {
               val phiOrPsi = disjuncts.reduceLeft(or(_)(_))
               if (
                 t.zip(disjuncts).forall { case (s, phi) => isSubset(ref(s).left, b.left + phi) } &&
-                isSubset(b.left, t.map(ref(_).left).fold(Set.empty)(_ union _) + phiOrPsi)
+                isSubset(b.left, t.map(ref(_).left).fold(SSet.empty)(_ union _) + phiOrPsi)
               )
                 SCValidProof(SCProof(step))
               else SCInvalidProof(SCProof(step), Nil, s"Left-hand side of conclusion + disjuncts is not the same as the union of the left-hand sides of the premises + φ∨ψ.")
@@ -222,10 +222,10 @@ object SCProofChecker {
               SCInvalidProof(SCProof(step), Nil, "all φs must be a formula, but " + culprit + " is a " + culprit.sort)
             } else {
               val phiAndPsi = cunjuncts.reduce(and(_)(_))
-              if (isSameSet(b.left, t.map(ref(_).left).fold(Set.empty)(_ union _)))
+              if (isSameSet(b.left, t.map(ref(_).left).fold(SSet.empty)(_ union _)))
                 if (
                   t.zip(cunjuncts).forall { case (s, phi) => isSubset(ref(s).right, b.right + phi) } &&
-                  isSubset(b.right, t.map(ref(_).right).fold(Set.empty)(_ union _) + phiAndPsi)
+                  isSubset(b.right, t.map(ref(_).right).fold(SSet.empty)(_ union _) + phiAndPsi)
                   // isSameSet(cunjuncts.foldLeft(b.right)(_ + _), t.map(ref(_).right).fold(Set.empty)(_ union _) + phiAndPsi)
                 )
                   SCValidProof(SCProof(step))

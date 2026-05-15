@@ -7,6 +7,7 @@ import lisa.kernel.proof.SequentCalculus._
 import lisa.utils.KernelHelpers.{_, given}
 import org.scalatest.funsuite.AnyFunSuite
 
+import scala.collection.immutable.SortedSet
 import scala.language.adhocExtensions
 import scala.util.Random
 
@@ -281,7 +282,7 @@ class ProofTests extends AnyFunSuite {
     }
     val orig = subformulas.next().head
     val swapped = subformulasSwapped.next().head
-    val prf = SCProof(Vector(Hypothesis(Sequent(Set(orig), Set(orig)), orig), Restate(Sequent(Set(orig), Set(swapped)), 0)))
+    val prf = SCProof(Vector(Hypothesis(Sequent(SortedSet(orig), SortedSet(orig)), orig), Restate(Sequent(SortedSet(orig), SortedSet(swapped)), 0)))
     assert(checkSCProof(prf).isValid)
   }
 }

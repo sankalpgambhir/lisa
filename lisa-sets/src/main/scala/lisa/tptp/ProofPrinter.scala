@@ -58,7 +58,7 @@ object ProofPrinter {
 
   def sequentToFOFStatement(sequent: K.Sequent, strict: Boolean = false): FOF.Statement = {
     if sequent.left.isEmpty && sequent.right.size == 1 then FOF.Logical(formulaToFOFFormula(sequent.right.head, Set(), strict))
-    else FOF.Sequent(sequent.left.map(formulaToFOFFormula(_, Set(), strict)).toSeq, sequent.right.map(formulaToFOFFormula(_, Set(), strict)).toSeq)
+    else FOF.Sequent((sequent.left: Set[K.Expression]).map(formulaToFOFFormula(_, Set(), strict)).toSeq, (sequent.right: Set[K.Expression]).map(formulaToFOFFormula(_, Set(), strict)).toSeq)
   }
 
   def isLowerWord(s: String): Boolean = s.head.isLower && s.tail.forall(_.isLetterOrDigit)

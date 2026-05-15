@@ -562,6 +562,9 @@ trait WithTheorems {
       extends THM {
     import lisa.utils.Serialization.*
 
+    private inline def cacheId =
+      (fullName, possibleGoal).hashCode()
+
     val (innerJustification: theory.Theorem, provedStatement: F.Sequent) =
       if library._draft.nonEmpty && library._draft.get.value != file && possibleGoal.isDefined
       then
@@ -569,7 +572,7 @@ trait WithTheorems {
         // where the draft option is given, and the theorem has a defined goal
         // statement, then we replace the proof by sorry
         val goal = possibleGoal.get
-        theory.theorem(name, goal.underlying, SCProof(SC.Sorry(goal.underlying)), IndexedSeq.empty) match {
+        theory.theorem(fullName, goal.underlying, SCProof(SC.Sorry(goal.underlying)), IndexedSeq.empty) match {
           case K.Judgement.ValidJustification(just) =>
             (just, goal)
           case wrongJudgement: K.Judgement.InvalidJustification[?] =>
@@ -581,22 +584,24 @@ trait WithTheorems {
               )
             )
         }
-      else if library._withCache then
-        oneThmFromFile("cache/" + name, library.theory) match {
+      else if library._withCache && possibleGoal.isDefined then
+        val cachePath = s"cache/$cacheId"
+        oneThmFromFile(cachePath, library.theory) match {
           case Some(thm) =>
+            println(s"Loaded theorem $fullName from cache.")
             val goal = possibleGoal.getOrElse {
               // cached theorem with no known goal, lift the kernel sequent
               val K.Sequent(left, right) = thm.proposition
               F.Sequent(
-                left.map(F.asFrontExpression(_).asInstanceOf),
-                right.map(F.asFrontExpression(_).asInstanceOf)
+                (left: Set[K.Expression]).map(F.asFrontExpression(_).asInstanceOf),
+                (right: Set[K.Expression]).map(F.asFrontExpression(_).asInstanceOf)
               )
             }
             (thm, goal) // try to get the theorem from file
 
           case None =>
             val (thm, proof, scp, justifs) = prove(computeProof) // if fail, prove it
-            thmsToFile("cache/" + name, theory, List((name, flattenProof(scp), justifs))) // and save it to the file
+            thmsToFile(cachePath, theory, List((fullName, flattenProof(scp), justifs))) // and save it to the file
             (thm, proof.mostRecentStep.bot)
         }
       else
@@ -629,7 +634,7 @@ trait WithTheorems {
       // whatever the proof justifies
       val goal = possibleGoal.getOrElse(proof.mostRecentStep.bot)
 
-      theory.theorem(name, goal.underlying, scp, justifs.map(_._2)) match {
+      theory.theorem(fullName, goal.underlying, scp, justifs.map(_._2)) match {
         case K.Judgement.ValidJustification(just) =>
           (just, proof, scp, justifs)
         case wrongJudgement: K.Judgement.InvalidJustification[?] =>
