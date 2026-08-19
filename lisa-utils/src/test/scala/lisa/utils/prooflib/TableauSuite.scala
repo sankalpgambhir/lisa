@@ -5,8 +5,7 @@ import org.scalatest.funsuite.AnyFunSuite
 
 class TableauSuite extends AnyFunSuite:
 
-  private class TestLibrary extends Library
-  given lib: Library = TestLibrary()
+  given testLibrary: Library = new Library
 
   // --- Individual variables ---
   private val u = variable[Ind]
@@ -206,4 +205,3 @@ class TableauSuite extends AnyFunSuite:
     assert(found, "Tableau should find a proof for triggerStackOverflow2")
     assert(valid, "Proof for triggerStackOverflow2 should be valid")
   }
-
