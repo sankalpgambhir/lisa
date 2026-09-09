@@ -17,6 +17,7 @@ import lisa.utils.prooflib.Subproof
 import lisa.utils.prooflib.TacticHelpers.failWith
 
 import scala.collection.Set
+import scala.collection.mutable
 
 import F.{∀ => _, _}
 import TypingRules.{TAbs, TApp, TSort, TConvAdv}
@@ -47,6 +48,20 @@ object Tactics:
   private val p: Variable[Prop] = variable[Prop]
 
   object Typecheck:
+    /** Memoize recursive checks while constructing one typing proof. */
+    private final class Memo:
+      private val inferred = mutable.HashMap.empty[(Set[Long], Long), ProofJudgement]
+      private val checked = mutable.HashMap.empty[(Set[Long], Long, Long), ProofJudgement]
+
+      private def contextKey(localContext: Set[Expr[Prop]]): Set[Long] =
+        localContext.map(_.underlying.uniqueNumber)
+
+      def infer(localContext: Set[Expr[Prop]], tm: Expr[Ind])(compute: => ProofJudgement): ProofJudgement =
+        inferred.getOrElseUpdate((contextKey(localContext), tm.underlying.uniqueNumber), compute)
+
+      def check(localContext: Set[Expr[Prop]], tm: Expr[Ind], ty: Expr[Ind])(compute: => ProofJudgement): ProofJudgement =
+        checked.getOrElseUpdate((contextKey(localContext), tm.underlying.uniqueNumber, ty.underlying.uniqueNumber), compute)
+
     // Helper function: get universe level
     def getDepth(e: Expr[Ind]): Int = e match
       case App(universeOf, inner: Expr[Ind]) => 1 + getDepth(inner)
@@ -62,7 +77,7 @@ object Tactics:
         Subproof {
           goal match
             case typeOf(tm, ty) =>
-              val innerProof = checkProof(using SetTheoryLibrary)(premises, tm, ty)
+              val innerProof = checkProofMemo(using SetTheoryLibrary)(premises, tm, ty, Memo())
               if !innerProof.isValid then failWith(innerProof)
               val stmt = have(innerProof)
               val (toEliminate, toKeep) = stmt.statement.left.partition {
@@ -88,13 +103,17 @@ object Tactics:
      * Infer the type of the given term(↑)
      */
     def inferProof(using lib: SetTheoryLibrary.type, proof: Proof)(localContext: Set[Expr[Prop]], tm: Expr[Ind]): ProofJudgement =
+      inferProofMemo(using lib, proof)(localContext, tm, Memo())
+
+    private def inferProofMemo(using lib: SetTheoryLibrary.type, proof: Proof)(localContext: Set[Expr[Prop]], tm: Expr[Ind], memo: Memo): ProofJudgement =
+      memo.infer(localContext, tm) {
       import lib.*
       // println("Infer term:" + tm.toString())
       Subproof {
         tm match
           // e1: Π(x:T1).T2, e2: T1 => e1(e2): T2(e2)
           case Sapp(func: Expr[Ind], tm2: Expr[Ind]) =>
-            val funcProof = inferProof(using SetTheoryLibrary)(localContext, func)
+            val funcProof = inferProofMemo(using SetTheoryLibrary)(localContext, func, memo)
             if !funcProof.isValid then failWith(funcProof)
             val h1 = have(funcProof)
             val funcInferredType = h1.statement.right.head match
@@ -102,7 +121,7 @@ object Tactics:
               case _ => failWith("Failed to extract the inferred type from valid proof")
             funcInferredType match // func's type must be Π-class
               case SPi(ty1: Expr[Ind], ty2: Expr[Ind >>: Ind]) =>
-                val typeLevelProof = checkProof(using SetTheoryLibrary)(localContext, tm2, ty1)
+                val typeLevelProof = checkProofMemo(using SetTheoryLibrary)(localContext, tm2, ty1, memo)
                 if !typeLevelProof.isValid then failWith(typeLevelProof)
                 val h2 = have(typeLevelProof)
                 val (boundVar, typeBody) = ty2 match
@@ -115,7 +134,7 @@ object Tactics:
           // ∀(x ∈ T1, e(x) ∈ T2(x)) => abs(T1)(e) ∈ Pi(T1)(T2)
           case Sabs(ty: Expr[Ind], Abs(boundVar: Expr[Ind], body: Expr[Ind])) =>
             val newContext = localContext ++ Set(boundVar ∈ ty)
-            val bodyProof = inferProof(using SetTheoryLibrary)(newContext, body)
+            val bodyProof = inferProofMemo(using SetTheoryLibrary)(newContext, body, memo)
             if !bodyProof.isValid then failWith(s"Sabs: Failed to infer the type of the given body($body)")
             val h1 = have(bodyProof)
             val bodyInferredType = h1.statement.right.head match
@@ -132,7 +151,7 @@ object Tactics:
           // Π(x: T1).T2 : U, select the relative bigger type as the final product's type
           case SPi(ty: Expr[Ind], Abs(boundVar: Expr[Ind], body: Expr[Ind])) =>
             val newContext = localContext ++ Set(boundVar ∈ ty)
-            val bodyProof = inferProof(using SetTheoryLibrary)(newContext, body)
+            val bodyProof = inferProofMemo(using SetTheoryLibrary)(newContext, body, memo)
             if !bodyProof.isValid then failWith(s"SPi: Failed to infer the type of the given body($body)")
             val h1 = have(bodyProof)
             val u2 = h1.statement.right.head match
@@ -180,7 +199,7 @@ object Tactics:
                 @annotation.tailrec
                 def antecedents(formula: Expr[Prop], acc: Set[Expr[Prop]] = Set.empty): (Set[Expr[Prop]], Expr[Prop]) =
                   formula match
-                    case premise ==> result => antecedents(result, acc + premise)
+                    case premise ==> result => antecedents(result, acc union Set(premise))
                     case result => acc -> result
                 val (requirements, result) = antecedents(instance)
                 if !isSame(result, typing) then failWith(s"Instantiated typing theorem for $tcf concludes $result instead of $typing.")
@@ -198,11 +217,16 @@ object Tactics:
               case Some(ty) => have(tm ∈ ty |- tm ∈ ty) by Hypothesis
               case None => have(tm ∈ universeOf(tm)) by Tautology.from(TSort of (U := tm))
       }
+      }
 
     /**
      * Check the type of the given term(↓)
      */
     def checkProof(using lib: SetTheoryLibrary.type, proof: Proof)(localContext: Set[Expr[Prop]], tm: Expr[Ind], ty: Expr[Ind]): ProofJudgement =
+      checkProofMemo(using lib, proof)(localContext, tm, ty, Memo())
+
+    private def checkProofMemo(using lib: SetTheoryLibrary.type, proof: Proof)(localContext: Set[Expr[Prop]], tm: Expr[Ind], ty: Expr[Ind], memo: Memo): ProofJudgement =
+      memo.check(localContext, tm, ty) {
       import lib.*
       // println("Check term's type: " + tm.toString() + " ∈ " + ty.toString())
       Subproof {
@@ -215,7 +239,7 @@ object Tactics:
             have(ty1 === ty1prime) by RightRefl.withParameters(ty1 === ty1prime)
             val newContext = localContext ++ Set(newBoundVariable ∈ ty1)
             val newBody2 = body2.substitute((replaceVar, newBoundVariable))
-            val bodyProof = checkProof(using SetTheoryLibrary)(newContext, body1, newBody2)
+            val bodyProof = checkProofMemo(using SetTheoryLibrary)(newContext, body1, newBody2, memo)
             if bodyProof.isValid then
               val h1 = have(bodyProof)
               val resetBot = h1.statement -<< (newBoundVariable ∈ ty1)
@@ -229,7 +253,7 @@ object Tactics:
 
           // e ∈ T, T === T' -> e ∈ T' for other cases
           case _ =>
-            val inferredProof = inferProof(using SetTheoryLibrary)(localContext, tm)
+            val inferredProof = inferProofMemo(using SetTheoryLibrary)(localContext, tm, memo)
             if !inferredProof.isValid then failWith(s"Failed to construct the inference proof for $tm")
             val h1 = have(inferredProof)
             val inferredType = h1.statement.right.head match
@@ -248,6 +272,7 @@ object Tactics:
                 T1 := ty
               )
             )
+      }
       }
 
     // Construct subset proof(ty1 ⊆ ty2) for the given two expressions
