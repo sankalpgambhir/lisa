@@ -7,7 +7,8 @@ import org.scalatest.funsuite.AnyFunSuite
 
 class SimpleDerivedStepsSuite extends AnyFunSuite:
 
-  given testLibrary: Library = new Library
+  private class TestLibrary extends Library
+  given testLibrary: Library = new TestLibrary
 
   private val x = variable[Ind]
   private val y = variable[Ind]
