@@ -67,6 +67,10 @@ object Tactics:
       case App(universeOf, inner: Expr[Ind]) => 1 + getDepth(inner)
       case _ => 1
 
+    private def inferredType(statement: F.Sequent, term: Expr[Ind]): Option[Expr[Ind]] =
+      statement.right.collectFirst:
+        case typeOf(candidate, typ) if isSame(candidate, term) => typ
+
     // Bidirectional type checking proof construct(infer, check, equal)
     def prove(using lib: SetTheoryLibrary.type, proof: Proof)(bot: F.Sequent): ProofJudgement =
       import lib.*
@@ -116,9 +120,8 @@ object Tactics:
             val funcProof = inferProofMemo(using SetTheoryLibrary)(localContext, func, memo)
             if !funcProof.isValid then failWith(funcProof)
             val h1 = have(funcProof)
-            val funcInferredType = h1.statement.right.head match
-              case typeOf(tm, ty) => ty
-              case _ => failWith("Failed to extract the inferred type from valid proof")
+            val funcInferredType = inferredType(h1.statement, func).getOrElse:
+              failWith("Failed to extract the inferred function type from valid proof")
             funcInferredType match // func's type must be Π-class
               case SPi(ty1: Expr[Ind], ty2: Expr[Ind >>: Ind]) =>
                 val typeLevelProof = checkProofMemo(using SetTheoryLibrary)(localContext, tm2, ty1, memo)
@@ -135,11 +138,10 @@ object Tactics:
           case Sabs(ty: Expr[Ind], Abs(boundVar: Expr[Ind], body: Expr[Ind])) =>
             val newContext = localContext ++ Set(boundVar ∈ ty)
             val bodyProof = inferProofMemo(using SetTheoryLibrary)(newContext, body, memo)
-            if !bodyProof.isValid then failWith(s"Sabs: Failed to infer the type of the given body($body)")
+            if !bodyProof.isValid then failWith(bodyProof)
             val h1 = have(bodyProof)
-            val bodyInferredType = h1.statement.right.head match
-              case typeOf(tm, ty) => ty
-              case _ => failWith("Sabs: Failed to extract the inferred type from valid proof")
+            val bodyInferredType = inferredType(h1.statement, body).getOrElse:
+              failWith("Sabs: Failed to extract the inferred body type from valid proof")
             val resetBot = h1.statement -<< (boundVar ∈ ty)
             have((boundVar ∈ ty |- body ∈ bodyInferredType) ++<< h1.statement) by Weakening(h1)
             thenHave((boundVar ∈ ty ==> body ∈ bodyInferredType) ++<< resetBot) by RightImplies
@@ -152,11 +154,10 @@ object Tactics:
           case SPi(ty: Expr[Ind], Abs(boundVar: Expr[Ind], body: Expr[Ind])) =>
             val newContext = localContext ++ Set(boundVar ∈ ty)
             val bodyProof = inferProofMemo(using SetTheoryLibrary)(newContext, body, memo)
-            if !bodyProof.isValid then failWith(s"SPi: Failed to infer the type of the given body($body)")
+            if !bodyProof.isValid then failWith(bodyProof)
             val h1 = have(bodyProof)
-            val u2 = h1.statement.right.head match
-              case typeOf(tm, ty) => ty
-              case _ => failWith("SPi: Failed to extract the inferred type from valid proof")
+            val u2 = inferredType(h1.statement, body).getOrElse:
+              failWith("SPi: Failed to extract the inferred body type from valid proof")
             val (u1, u1Facts, u1Primises) = localContext
               .collectFirst {
                 case typeOf(s, u) if isSame(s, ty) => (u, Seq(), Set(isUniverse(u), ty ∈ u))
@@ -256,11 +257,10 @@ object Tactics:
             val inferredProof = inferProofMemo(using SetTheoryLibrary)(localContext, tm, memo)
             if !inferredProof.isValid then failWith(s"Failed to construct the inference proof for $tm")
             val h1 = have(inferredProof)
-            val inferredType = h1.statement.right.head match
-              case typeOf(tm, ty) => ty
-              case _ => failWith("Failed to extract the inferred type from valid proof")
-            val convProof = subsetProof(using SetTheoryLibrary)(localContext, inferredType, ty)
-            if !convProof.isValid then failWith(s"Failed to construct the equivalence proof for $inferredType and $ty")
+            val inferred = inferredType(h1.statement, tm).getOrElse:
+              failWith("Failed to extract the inferred type from valid proof")
+            val convProof = subsetProof(using SetTheoryLibrary)(localContext, inferred, ty)
+            if !convProof.isValid then failWith(s"Failed to construct the equivalence proof for $inferred and $ty")
             val h2 = have(convProof)
             val statement = (tm ∈ ty) ++<< h1.statement ++<< h2.statement
             have(statement) by Tautology.from(
@@ -268,7 +268,7 @@ object Tactics:
               h2,
               TConvAdv of (
                 e1 := tm,
-                T := inferredType,
+                T := inferred,
                 T1 := ty
               )
             )
