@@ -593,6 +593,19 @@ object HOLSteps extends lisa._HOL {
       else prem
     }
 
+    /** Replace conjunction assumptions with their components. */
+    private def allConjunctions(using proof: Proof)(prem: Thm): ProofJudgement = Subproof { ip ?=>
+      prem.statement.left.collectFirst { case conjunction @ (left /\ right) => (conjunction, left, right) } match
+        case None => prem
+        case Some((conjunction, left, right)) =>
+          val assumptions = (prem.statement.left - conjunction) ++ Set(left, right)
+          val leftProof = have(assumptions |- left) by Hypothesis.withParameters(left)
+          val rightProof = have(assumptions |- right) by Hypothesis.withParameters(right)
+          val conjunctionProof = have(assumptions |- conjunction) by RightAnd.withParameters(Seq(left, right))(Seq(leftProof, rightProof))
+          val expanded = have(assumptions |- prem.statement.right) by Cut.withParameters(conjunction)(conjunctionProof, prem)
+          have(allConjunctions(expanded))
+    }
+
     // Eliminate a type-variable non-emptiness assumption using HOL's inhabited universe.
     def typeVar(using proof: Proof)(net: Expr[Prop], tv: Variable[Ind])(prem: Thm): ProofJudgement = Subproof { ip ?=>
       val p2 = have(prem.statement -<? net +<< nonEmptyTypeExists.statement.right.head) by LeftExists.withParameters(net, tv)(prem)
@@ -818,7 +831,8 @@ object HOLSteps extends lisa._HOL {
 
     // Clean assumptions from cheapest and most local to recursively derived types.
     def all(using proof: Proof)(prem: Thm): ProofJudgement = Subproof { ip ?=>
-      val h1 = have(Clean.allVariables(prem))
+      val expanded = have(allConjunctions(prem))
+      val h1 = have(Clean.allVariables(expanded))
       val h2 = have(allInhabited(h1))
       val h3 = have(Clean.allTypeVars(h2))
       val h4 = have(Clean.allComposites(h3))
