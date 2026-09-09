@@ -5,7 +5,8 @@ import org.scalatest.funsuite.AnyFunSuite
 
 class HornSuite extends AnyFunSuite:
 
-  given testLibrary: Library = new Library
+  private class TestLibrary extends Library
+  given testLibrary: Library = TestLibrary()
 
   private val a = variable[Prop]
   private val b = variable[Prop]
