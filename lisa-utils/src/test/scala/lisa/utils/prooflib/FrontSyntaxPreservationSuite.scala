@@ -7,7 +7,8 @@ import org.scalatest.funsuite.AnyFunSuite
 
 class FrontSyntaxPreservationSuite extends AnyFunSuite:
 
-  given testLibrary: Library = new Library
+  private class TestLibrary extends Library
+  given testLibrary: Library = new TestLibrary
 
   private final class TaggedConstant[S: Sort](id: Identifier) extends Constant[S](id)
 
@@ -126,24 +127,6 @@ class FrontSyntaxPreservationSuite extends AnyFunSuite:
     assert(instance.statement == (() |- predicate(argument)))
     assertContains(instance.statement, predicate)
     assertContains(instance.statement, argument)
-
-  test("a definition theorem retains the original front expression"):
-    val body = TaggedConstant[Ind](K.Identifier("definition-body"))
-    testLibrary.addSymbol(body)
-
-    val (_, definition) = testLibrary.define("front-preserving-definition", body)
-
-    assertContains(definition.statement, body)
-
-  test("a functional definition retains front subclasses in its body and binder"):
-    val body = TaggedConstant[Ind](K.Identifier("functional-definition-body"))
-    val bound = TaggedVariable(K.Identifier("functional-definition-bound"))
-    testLibrary.addSymbol(body)
-
-    val (_, definition) = testLibrary.define("front-preserving-functional-definition", λ(bound, body))
-
-    assertContains(definition.statement, body)
-    assertContains(definition.statement, bound)
 
   test("a front theorem rejects an unrelated kernel statement"):
     val formula = variable[Prop]

@@ -209,6 +209,11 @@ trait Sequents extends Predef {
    * confined to their stated expressions.
    */
   final case class Thm(statement: Sequent, kernel: K.Thm, isSchema: Boolean = false):
+    require(
+      statement.underlying == kernel.statement,
+      s"Front statement ${statement.underlying} does not match kernel statement ${kernel.statement}."
+    )
+
     def kernelStatement: K.Sequent = kernel.statement
     def left: Set[Expr[Prop]] = statement.left
     def right: Set[Expr[Prop]] = statement.right
