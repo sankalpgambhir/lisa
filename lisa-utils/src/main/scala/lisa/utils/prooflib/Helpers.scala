@@ -35,13 +35,17 @@ object Helpers:
      * Checks whether this set is contained in the target set, allowing one exceptional expression.
      */
     inline def containedExcept[T, U](target: Set[Expr[T]], exception: Expr[U]): Boolean =
-      KH.containedExcept(set.map(_.underlying))(target.map(_.underlying), exception.underlying)
+      val underlyingTarget = target.map(_.underlying)
+      set.forall(formula => KH.containsEq(underlyingTarget)(formula.underlying) || expEq(formula, exception))
 
     /**
      * Checks whether this set is contained in the target set, allowing either of two exceptional expressions.
      */
     inline def containedExceptEither[T, U, V](target: Set[Expr[T]], exception1: Expr[U], exception2: Expr[V]): Boolean =
-      KH.containedExceptEither(set.map(_.underlying))(target.map(_.underlying), exception1.underlying, exception2.underlying)
+      val underlyingTarget = target.map(_.underlying)
+      set.forall(formula =>
+        KH.containsEq(underlyingTarget)(formula.underlying) || expEq(formula, exception1) || expEq(formula, exception2)
+      )
 
   /**
    * Returns source expressions that are not equivalent to any expression in the target set.
