@@ -1,7 +1,6 @@
 package lisa.maths.SetTheory.Types
 
 import lisa.SetTheoryLibrary
-import lisa.maths.SetTheory.Base.Subset.doubleInclusion
 import lisa.maths.SetTheory.Base.Subset.reflexivity
 import lisa.maths.SetTheory.Base.Subset.transitivity
 import lisa.maths.SetTheory.Cardinal.Predef.isUniverse
@@ -11,9 +10,7 @@ import lisa.maths.SetTheory.Functions.Predef._
 import lisa.utils.K
 import lisa.utils.fol.{FOL => F}
 import lisa.utils.prooflib.Exports._
-import lisa.utils.prooflib.ProofJudgement
-import lisa.utils.prooflib.Proof
-import lisa.utils.prooflib.Subproof
+import lisa.utils.prooflib.{Proof, ProofJudgement, Subproof, Thm}
 import lisa.utils.prooflib.TacticHelpers.failWith
 
 import scala.collection.Set
@@ -48,6 +45,18 @@ object Tactics:
   private val p: Variable[Prop] = variable[Prop]
 
   object Typecheck:
+    /** Extract one side of a proved conjunction with explicit sequent steps. */
+    private def conjunct(using lib: SetTheoryLibrary.type, proof: Proof)(fact: Thm, takeLeft: Boolean): Thm =
+      fact.statement.right.head match
+        case conjunction @ (left /\ right) =>
+          val selected = if takeLeft then left else right
+          val expandedLeft = fact.statement.left ++ Set(left, right)
+          val selectedHypothesis = have(expandedLeft |- selected) by Hypothesis.withParameters(selected)
+          val fromConjunction = have((fact.statement.left + conjunction) |- selected) by
+            LeftAnd.withParameters(left, right)(selectedHypothesis)
+          have(fact.statement.left |- selected) by Cut.withParameters(conjunction)(fact, fromConjunction)
+        case _ => throw new IllegalArgumentException(s"Expected a proved conjunction, got ${fact.statement}")
+
     /** Memoize recursive checks while constructing one typing proof. */
     private final class Memo:
       private val inferred = mutable.HashMap.empty[(Set[Long], Long), ProofJudgement]
@@ -94,8 +103,9 @@ object Tactics:
                   case App(cmd, App(tag, v: Expr[Ind])) => universeOfIsUniverse of (x := v)
                   case _ => throw new Exception("Unreachable code: structure validation failed")
               }.toSeq
-              val allFacts = Seq(stmt) ++ lemmaFacts
-              have(stmt.statement.removeAllLeft(toEliminate)) by Tautology.from(allFacts*)
+              val universeFacts = lemmaFacts.map(conjunct(_, takeLeft = true))
+              val cleaned = have(Discharge(universeFacts*)(stmt))
+              have(stmt.statement.removeAllLeft(toEliminate)) by Weakening(cleaned)
               thenHave(premises |- tm ∈ ty) by Weakening
             case _ => failWith("Type check can only check type relation(∈)")
         }
@@ -130,8 +140,10 @@ object Tactics:
                 val (boundVar, typeBody) = ty2 match
                   case Abs(v, body) => (v, body)
                   case _ => failWith(s"Inferred type T2($ty2) is not a lambda expression")
-                val statement = (tm ∈ typeBody.substitute((boundVar, tm2))) ++<< h1.statement ++<< h2.statement
-                have(statement) by Tautology.from(h1, h2, TApp of (e1 := func, e2 := tm2, T1 := ty1, T2 := ty2))
+                val application = TApp of (e1 := func, e2 := tm2, T1 := ty1, T2 := ty2)
+                val applied = have(Discharge(h1, h2)(application))
+                val result = tm ∈ typeBody.substitute(boundVar := tm2)
+                have((applied.statement.left |- result)) by Restate.from(applied)
               case _ => failWith(s"$funcInferredType must be a Π-type")
 
           // ∀(x ∈ T1, e(x) ∈ T2(x)) => abs(T1)(e) ∈ Pi(T1)(T2)
@@ -146,9 +158,9 @@ object Tactics:
             have((boundVar ∈ ty |- body ∈ bodyInferredType) ++<< h1.statement) by Weakening(h1)
             thenHave((boundVar ∈ ty ==> body ∈ bodyInferredType) ++<< resetBot) by RightImplies
             thenHave((∀(boundVar ∈ ty, body ∈ bodyInferredType)) ++<< resetBot) by RightForall
-            thenHave((tm ∈ Pi(ty)(λ(boundVar, bodyInferredType))) ++<< resetBot) by Tautology.fromLastStep(
-              TAbs of (T1 := ty, T2 := Abs(boundVar, bodyInferredType), e := Abs(boundVar, body))
-            )
+            val quantifiedTyping = lastStep
+            val abstraction = TAbs of (T1 := ty, T2 := Abs(boundVar, bodyInferredType), e := Abs(boundVar, body))
+            have(Discharge(quantifiedTyping)(abstraction))
 
           // Π(x: T1).T2 : U, select the relative bigger type as the final product's type
           case SPi(ty: Expr[Ind], Abs(boundVar: Expr[Ind], body: Expr[Ind])) =>
@@ -158,12 +170,12 @@ object Tactics:
             val h1 = have(bodyProof)
             val u2 = inferredType(h1.statement, body).getOrElse:
               failWith("SPi: Failed to extract the inferred body type from valid proof")
-            val (u1, u1Facts, u1Primises) = localContext
+            val (u1, u1Fact, u1Premises) = localContext
               .collectFirst {
-                case typeOf(s, u) if isSame(s, ty) => (u, Seq(), Set(isUniverse(u), ty ∈ u))
+                case typeOf(s, u) if isSame(s, ty) => (u, None, Set(isUniverse(u), ty ∈ u))
               }
               .getOrElse {
-                (universeOf(ty), Seq(universeOfIsUniverse of (x := ty)), Set())
+                (universeOf(ty), Some(universeOfIsUniverse of (x := ty)), Set())
               }
             val (maxU, minU, closureThm) =
               if getDepth(u1) > getDepth(u2) then (u1, u2, universeHierarchyPiClosureRight)
@@ -175,9 +187,14 @@ object Tactics:
             have((boundVar ∈ ty |- body ∈ u2) ++<< h1.statement) by Weakening(h1)
             thenHave((boundVar ∈ ty ==> body ∈ u2) ++<< resetBot) by RightImplies
             thenHave((∀(boundVar ∈ ty, body ∈ u2)) ++<< resetBot) by RightForall
-            thenHave((u1Primises ++ Set(isUniverse(u2)) |- tm ∈ maxU) ++<< resetBot) by Tautology.fromLastStep(
-              Seq(closureThm of (T1 := ty, T2 := Abs(boundVar, body), U1 := u1, U2 := u2), subRel) ++ u1Facts*
-            )
+            val quantifiedBody = lastStep
+            val closure = closureThm of (T1 := ty, T2 := Abs(boundVar, body), U1 := u1, U2 := u2)
+            val closed = have(Discharge(quantifiedBody, subRel)(closure))
+            val withUniverse = u1Fact.fold(closed): fact =>
+              val universe = conjunct(fact, takeLeft = true)
+              val membership = conjunct(fact, takeLeft = false)
+              have(Discharge(universe, membership)(closed))
+            have(((u1Premises ++ Set(isUniverse(u2)) |- tm ∈ maxU) ++<< resetBot)) by Weakening(withUniverse)
 
           // Other cases, like single variable
           case tCst: TypedConstant => have(tCst.justif)
@@ -204,19 +221,20 @@ object Tactics:
                     case result => acc -> result
                 val (requirements, result) = antecedents(instance)
                 if !isSame(result, typing) then failWith(s"Instantiated typing theorem for $tcf concludes $result instead of $typing.")
-                have((localContext ++ requirements) |- typing) by Tautology.from(instantiated)
+                val required = have(requirements |- typing) by Restate.from(instantiated)
+                have((localContext ++ requirements) |- typing) by Weakening(required)
 
               case _ =>
                 val tyOpt: Option[Expr[Ind]] = localContext.collectFirst { case typeOf(t1, t2) if isSame(t1, tm) => t2 }
                 tyOpt match
                   case Some(ty) => have(tm ∈ ty |- tm ∈ ty) by Hypothesis
-                  case None => have(tm ∈ universeOf(tm)) by Tautology.from(TSort of (U := tm))
+                  case None => have(TSort of (U := tm))
 
           case _ =>
             val tyOpt: Option[Expr[Ind]] = localContext.collectFirst { case typeOf(t1, t2) if isSame(t1, tm) => t2 }
             tyOpt match
               case Some(ty) => have(tm ∈ ty |- tm ∈ ty) by Hypothesis
-              case None => have(tm ∈ universeOf(tm)) by Tautology.from(TSort of (U := tm))
+              case None => have(TSort of (U := tm))
       }
       }
 
@@ -247,9 +265,9 @@ object Tactics:
               have((newBoundVariable ∈ ty1 |- body1 ∈ newBody2) ++<< h1.statement) by Weakening(h1)
               thenHave((newBoundVariable ∈ ty1 ==> body1 ∈ newBody2) ++<< resetBot) by RightImplies
               thenHave((∀(newBoundVariable ∈ ty1, body1 ∈ newBody2)) ++<< resetBot) by RightForall
-              thenHave((tm ∈ ty) ++<< resetBot) by Tautology.fromLastStep(
-                TAbs of (T1 := ty1, T2 := ty2, e := body)
-              )
+              val quantifiedTyping = lastStep
+              val abstraction = TAbs of (T1 := ty1, T2 := ty2, e := body)
+              have(Discharge(quantifiedTyping)(abstraction))
             else failWith("Failed to construct body proof")
 
           // e ∈ T, T === T' -> e ∈ T' for other cases
@@ -262,16 +280,8 @@ object Tactics:
             val convProof = subsetProof(using SetTheoryLibrary)(localContext, inferred, ty)
             if !convProof.isValid then failWith(s"Failed to construct the equivalence proof for $inferred and $ty")
             val h2 = have(convProof)
-            val statement = (tm ∈ ty) ++<< h1.statement ++<< h2.statement
-            have(statement) by Tautology.from(
-              h1,
-              h2,
-              TConvAdv of (
-                e1 := tm,
-                T := inferred,
-                T1 := ty
-              )
-            )
+            val conversion = TConvAdv of (e1 := tm, T := inferred, T1 := ty)
+            have(Discharge(h1, h2)(conversion))
       }
       }
 
@@ -288,29 +298,31 @@ object Tactics:
             val codomainProof = subsetProof(using SetTheoryLibrary)(newContext, c1, c2Replace)
             if !codomainProof.isValid then failWith(s"Cannot prove codomain covariance: '${c1} ⊆ ${c2Replace}' for variable ${v1}.")
             val h1 = have(codomainProof)
-            have(c1 ⊆ c2Replace ++<< h1.statement) by Tautology.from(have(codomainProof))
+            have(h1)
             thenHave((v1 ∈ d1 ==> c1 ⊆ c2Replace) ++<< h1.statement) by Weakening
             thenHave(∀(v1 ∈ d1, c1 ⊆ c2Replace) ++<< h1.statement) by RightForall
-            thenHave(sub ⊆ sup ++<< h1.statement) by Tautology.fromLastStep(domainEquiv, piCovariance of (T := d1, T1 := d2, T2 := Abs(v1, c1), T2p := Abs(v2, c2)))
+            val quantifiedCovariance = lastStep
+            val covariance = piCovariance of (T := d1, T1 := d2, T2 := Abs(v1, c1), T2p := Abs(v2, c2))
+            have(Discharge(domainEquiv, quantifiedCovariance)(covariance))
           case _ =>
             val dSub = getDepth(sub)
             val dSup = getDepth(sup)
             if (dSub > dSup) then failWith(s"Depth mismatch: $sub (d=$dSub) cannot be subset of $sup (d=$dSup)")
             else if (dSub == dSup) then
               if (localContext.contains(sub ⊆ sup)) then have(sub ⊆ sup |- sub ⊆ sup) by Hypothesis
-              else if (sub == sup) then have(sub ⊆ sup) by Tautology.from(reflexivity of (x := sub))
+              else if (sub == sup) then have(reflexivity of (x := sub))
               else
-                have(sub === sup) by RightRefl.withParameters(sub === sup)
-                thenHave(sub ⊆ sup) by Tautology.fromLastStep(doubleInclusion of (x := sub, y := sup))
-            else if (dSub == dSup - 1) then have(sub ⊆ universeOf(sub)) by Tautology.from(subsetOfUniverse of (A := sub))
+                val equality = have(sub === sup) by RightRefl.withParameters(sub === sup)
+                val reflexive = have(reflexivity of (x := sub))
+                val rewritten = have(sub === sup |- sub ⊆ sup) by
+                  RightSubstEq.withParameters(List((sub, sup)), (Seq(T), sub ⊆ T))(reflexive)
+                have(Discharge(equality)(rewritten))
+            else if (dSub == dSup - 1) then have(subsetOfUniverse of (A := sub))
             else
-              val step1 = have(sub ⊆ universeOf(sub)) by Tautology.from(subsetOfUniverse of (A := sub))
+              val step1 = have(subsetOfUniverse of (A := sub))
               val step2Proof = subsetProof(using SetTheoryLibrary)(localContext, universeOf(sub), sup)
               if !step2Proof.isValid then failWith(s"Further subset proof failed: ${universeOf(sub)} and $sup")
               val step2 = have(step2Proof)
-              have(sub ⊆ sup) by Tautology.from(
-                step1,
-                step2,
-                transitivity of (x := sub, y := universeOf(sub), z := sup)
-              )
+              val transitive = transitivity of (x := sub, y := universeOf(sub), z := sup)
+              have(Discharge(step1, step2)(transitive))
       }
