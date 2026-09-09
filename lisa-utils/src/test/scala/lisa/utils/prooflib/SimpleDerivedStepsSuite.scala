@@ -140,7 +140,7 @@ class SimpleDerivedStepsSuite extends AnyFunSuite:
     SubproofM:
       val eq = have(() |- (P(x) <=> Q(x))) by BasicStep.Sorry
       val sub = Substitute.from(premise, eq)(P(a) |- Q(a))
-      
+
       assertValid(sub)
       sub
 

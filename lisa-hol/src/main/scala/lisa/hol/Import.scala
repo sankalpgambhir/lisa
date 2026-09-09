@@ -493,11 +493,11 @@ object Import extends lisa.HOL:
     /**
      * Pattern match a type definition abstraction theorem of the form:
      *   |- abs (rep a) = a
-     * 
+     *
      * where `abs: rty -> aty`, and `rep: aty -> rty`.
-     * 
+     *
      * `aty` is the type being defined from a subset of `rty`.
-     * 
+     *
      * returning `(aty, rty, abs, rep, a)`
      */
     object AbsTh:
@@ -513,11 +513,11 @@ object Import extends lisa.HOL:
     /**
      * Pattern match a type definition representation theorem of the form:
      *   |- P r <=> rep (abs r) = r
-     * 
+     *
      * where `abs: rty -> aty`, and `rep: aty -> rty`.
-     * 
+     *
      * `aty` is the type being defined from a subset of `rty`.
-     * 
+     *
      * returning `(aty, rty, abs, rep, P, r)`
      */
     object RepTh:
@@ -527,7 +527,7 @@ object Import extends lisa.HOL:
           case Eq(
             Comb(p, r @ Var(_, _)),
             Eq(
-              Comb(rep @ Cst(_, FunType(aty, rty)), Comb(abs @ Cst(_, _), r2)), 
+              Comb(rep @ Cst(_, FunType(aty, rty)), Comb(abs @ Cst(_, _), r2)),
               r3
             )
           ) if r == r2 && r == r3 =>

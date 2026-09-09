@@ -134,8 +134,8 @@ object HOLHelperTheorems extends lisa.Main {
     val e2 = variable[Ind]
     val T = variable[Ind]
 
-    val beta1 = have(fun(y :: A, eqTerm) * y === eqTerm) by Weakening(BetaReduction of (T := A, e2 := y, e := λ(y, eqTerm))) 
-    val beta2 = have(fun(x :: A, fun(y :: A, eqTerm)) * x === fun(y :: A, eqTerm)) by Weakening(BetaReduction of (T := A, e2 := x, e := λ(x, fun(y :: A, eqTerm)))) 
+    val beta1 = have(fun(y :: A, eqTerm) * y === eqTerm) by Weakening(BetaReduction of (T := A, e2 := y, e := λ(y, eqTerm)))
+    val beta2 = have(fun(x :: A, fun(y :: A, eqTerm)) * x === fun(y :: A, eqTerm)) by Weakening(BetaReduction of (T := A, e2 := x, e := λ(x, fun(y :: A, eqTerm))))
     
     have(fun(x :: A, fun(y :: A, eqTerm)) * x * y === fun(x :: A, fun(y :: A, eqTerm)) * x * y) by Restate
     thenHave(fun(x :: A, fun(y :: A, eqTerm)) * x * y === fun(y :: A, eqTerm) * y) by Substitute(beta2)
