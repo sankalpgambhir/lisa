@@ -101,6 +101,15 @@ class FrontSyntaxPreservationSuite extends AnyFunSuite:
     assertContains(retainedTheorem.statement, tagged)
     assertContains(retainedTheorem.thm.statement, tagged)
 
+  test("a definition retains subclasses nested in its body"):
+    val library = new TestLibrary
+    val tagged = TaggedConstant[Ind](K.Identifier("definition-body-tag"))
+    library.addSymbol(tagged)
+
+    val defined = library.DEF[Ind](using sourcecode.FullName("nested-definition"))(tagged)
+
+    assertContains(library.definition(defined).statement, tagged)
+
   test("Thm instantiation substitutes the retained front statement"):
     val predicate = TaggedConstant[Ind >>: Prop](K.Identifier("instance-predicate"))
     val variable = TaggedVariable(K.Identifier("instance-variable"))

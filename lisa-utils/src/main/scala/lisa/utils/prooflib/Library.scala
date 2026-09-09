@@ -34,12 +34,22 @@ abstract class Library:
     definitions.update(constant.underlying, thm)
     thm
 
+  private def registerDirectDefinition[S](constant: Constant[S], expression: Expr[S], vars: Seq[Variable[?]], definition: K.Thm): Thm =
+    val appliedConstant = Multiapp.unsafe(constant, vars)
+    val appliedExpression = Multiapp.unsafe(expression, vars)
+    val formula =
+      if appliedConstant.sort == K.Prop then appliedConstant.asInstanceOf[Expr[Prop]] <=> appliedExpression.asInstanceOf[Expr[Prop]]
+      else appliedConstant.asInstanceOf[Expr[Ind]] === appliedExpression.asInstanceOf[Expr[Ind]]
+    val thm = Thm(Sequent(Set.empty, Set(formula)), definition, isSchema = true)
+    definitions.update(constant.underlying, thm)
+    thm
+
   def DEF[S: Sort](using name: sourcecode.FullName)(expression: Expr[S]): Constant[S] =
     val cst = constant[S](name.value)
     val vars = leadingVars(expression)
     K.Definition(using theory)(cst.underlying, vars.map(_.underlying), expression.underlying) match
       case Right(definition) =>
-        registerDefinition(cst, definition)
+        registerDirectDefinition(cst, expression, vars, definition)
         cst
       case Left(error) =>
         throw new IllegalArgumentException(s"Invalid definition ${name.value}: $error")
@@ -54,7 +64,7 @@ abstract class Library:
   class DirectDefinition[S: Sort](fullName: String, line: Int | sourcecode.Line, file: String | sourcecode.File)(expression: Expr[S], vars: Seq[Variable[?]]):
     val cst: Constant[S] = constant[S](fullName)
     K.Definition(using theory)(cst.underlying, vars.map(_.underlying), expression.underlying) match
-      case Right(definition) => registerDefinition(cst, definition)
+      case Right(definition) => registerDirectDefinition(cst, expression, vars, definition)
       case Left(error) => throw new IllegalArgumentException(s"Invalid definition $fullName: $error")
 
   def section(name: String)(using output: OutputManager, file: sourcecode.File): Unit =
